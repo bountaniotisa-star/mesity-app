@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Mesity</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0d1017;
+  --card: #161b25;
+  --card-hover: #1c2230;
+  --border: #232a38;
+  --accent: #34e8a5;
+  --accent-dim: rgba(52,232,165,0.15);
+  --text: #e8eaf0;
+  --text-dim: #8a8fa8;
+  --blue: #5b8af5;
+  --yellow: #f5c842;
+  --purple: #a578f5;
+  --orange: #f5924a;
+  --red: #f55a5a;
+  --green: #34e8a5;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: 'DM Sans', -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  padding-bottom: 80px;
+}
+h1,h2,h3 { font-family: 'Cormorant Garamond', serif; font-weight: 600; }
+
+/* === HEADER === */
+.header {
+  padding: 16px 16px 0;
+  position: sticky; top: 0; z-index: 100;
+  background: var(--bg);
+}
+.header-top {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 14px;
+}
+.logo { font-family: 'Cormorant Garamond', serif; font-size: 26px; font-weight: 700; color: var(--accent); letter-spacing: -0.5px; }
+.logo span { color: var(--text-dim); font-size: 13px; font-family: 'DM Sans'; font-weight: 400; margin-left: 8px; }
+.menu-btn {
+  width: 36px; height: 36px; border-radius: 10px; background: var(--card);
+  border: 1px solid var(--border); display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: 16px; color: var(--text-dim);
+}
+
+/* === STATS === */
+.stats {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+  padding: 0 16px 12px;
+}
+.stat-card {
+  background: var(--card); border-radius: 12px; padding: 12px 10px;
+  text-align: center; border: 1px solid var(--border);
+}
+.stat-num { font-size: 22px; font-weight: 700; font-family: 'DM Sans'; }
+.stat-label { font-size: 10px; color: var(--text-dim); margin-top: 2px; font-weight: 500; }
+
+/* === TABS === */
+.tabs {
+  display: flex; gap: 0; padding: 0 16px; border-bottom: 1px solid var(--border);
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+  background: var(--bg); position: sticky; top: 72px; z-index: 99;
+}
+.tab {
+  flex-shrink: 0; padding: 10px 14px; font-size: 13px; font-weight: 500;
+  color: var(--text-dim); cursor: pointer; border-bottom: 2px solid transparent;
+  transition: all 0.2s; white-space: nowrap;
+}
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* === SEARCH === */
+.search-bar {
+  padding: 12px 16px;
+}
+.search-bar input {
+  width: 100%; padding: 10px 14px; border-radius: 10px;
+  background: var(--card); border: 1px solid var(--border);
+  color: var(--text); font-size: 14px; font-family: 'DM Sans';
+  outline: none;
+}
+.search-bar input::placeholder { color: var(--text-dim); }
+.search-bar input:focus { border-color: var(--accent); }
+
+/* === FILTER CHIPS === */
+.filters {
+  display: flex; gap: 6px; padding: 0 16px 10px; overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.chip {
+  flex-shrink: 0; padding: 5px 12px; border-radius: 16px; font-size: 12px;
+  background: var(--card); border: 1px solid var(--border); color: var(--text-dim);
+  cursor: pointer; font-weight: 500; transition: all 0.15s;
+}
+.chip.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+
+/* === CONTENT === */
+.content { padding: 0 16px; }
+
+/* === LIST ITEMS === */
+.list-item {
+  background: var(--card); border-radius: 12px; padding: 14px;
+  margin-bottom: 8px; border: 1px solid var(--border);
+  cursor: pointer; transition: background 0.15s;
+}
+.list-item:active { background: var(--card-hover); }
+.li-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.li-code { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--accent); background: var(--accent-dim); padding: 2px 6px; border-radius: 4px; }
+.li-title { font-size: 14px; font-weight: 500; margin-top: 6px; line-height: 1.4; }
+.li-meta { font-size: 12px; color: var(--text-dim); margin-top: 4px; display: flex; flex-wrap: wrap; gap: 8px; }
+.badge {
+  display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 600;
+}
+.badge-green { background: rgba(52,232,165,0.15); color: var(--green); }
+.badge-yellow { background: rgba(245,200,66,0.15); color: var(--yellow); }
+.badge-red { background: rgba(245,90,90,0.15); color: var(--red); }
+.badge-blue { background: rgba(91,138,245,0.15); color: var(--blue); }
+.badge-purple { background: rgba(165,120,245,0.15); color: var(--purple); }
+
+/* === MATCH CARDS === */
+.match-card {
+  background: var(--card); border-radius: 14px; padding: 16px;
+  margin-bottom: 10px; border: 1px solid var(--border);
+}
+.score-circle {
+  width: 48px; height: 48px; border-radius: 50%; display: flex;
+  align-items: center; justify-content: center; font-size: 18px; font-weight: 700;
+  flex-shrink: 0;
+}
+.match-top { display: flex; gap: 14px; align-items: flex-start; }
+.match-info { flex: 1; }
+.match-reason { font-size: 12px; color: var(--text-dim); margin-top: 8px; font-style: italic; }
+
+/* === FOLLOW-UP CARDS === */
+.fu-card {
+  background: var(--card); border-radius: 12px; padding: 14px;
+  margin-bottom: 8px; border-left: 3px solid var(--orange);
+  border: 1px solid var(--border);
+}
+.fu-card.urgent { border-left-color: var(--red); }
+.fu-card.today { border-left-color: var(--orange); }
+.fu-card.tomorrow { border-left-color: var(--yellow); }
+.fu-card.future { border-left-color: var(--green); }
+.fu-header { display: flex; justify-content: space-between; align-items: center; }
+.fu-type { font-size: 18px; margin-right: 8px; }
+.complete-btn {
+  padding: 6px 14px; border-radius: 8px; background: var(--accent-dim);
+  color: var(--accent); border: 1px solid rgba(52,232,165,0.3); font-size: 12px;
+  font-weight: 600; cursor: pointer; font-family: 'DM Sans';
+}
+.complete-btn:active { background: var(--accent); color: var(--bg); }
+
+/* === DRAWER === */
+.drawer-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+  z-index: 200; opacity: 0; pointer-events: none; transition: opacity 0.3s;
+}
+.drawer-overlay.open { opacity: 1; pointer-events: auto; }
+.drawer {
+  position: fixed; top: 0; right: -100%; bottom: 0; width: 92%;
+  max-width: 400px; background: var(--bg); z-index: 201;
+  transition: right 0.3s ease; overflow-y: auto; padding: 20px 16px;
+}
+.drawer.open { right: 0; }
+.drawer-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 16px;
+}
+.drawer-close {
+  width: 32px; height: 32px; border-radius: 8px; background: var(--card);
+  border: 1px solid var(--border); color: var(--text-dim); font-size: 18px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+
+/* === CONTACT 360 === */
+.contact-detail { padding: 16px; }
+.cd-name { font-family: 'Cormorant Garamond'; font-size: 24px; font-weight: 600; margin-bottom: 4px; }
+.cd-info { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; }
+.cd-row { display: flex; gap: 8px; font-size: 13px; color: var(--text-dim); align-items: center; }
+.cd-row a { color: var(--accent); text-decoration: none; }
+.cd-section { margin-top: 16px; }
+.cd-section-title { font-size: 12px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+
+/* === MENU POPUP === */
+.menu-popup {
+  position: fixed; top: 56px; right: 16px; background: var(--card);
+  border: 1px solid var(--border); border-radius: 12px; padding: 6px 0;
+  z-index: 150; min-width: 200px; box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  display: none;
+}
+.menu-popup.show { display: block; }
+.menu-item {
+  padding: 10px 16px; font-size: 14px; cursor: pointer; display: flex;
+  align-items: center; gap: 10px; color: var(--text);
+}
+.menu-item:active { background: var(--card-hover); }
+.menu-item .mi-icon { font-size: 16px; width: 24px; text-align: center; }
+
+/* === EMPTY STATE === */
+.empty-state {
+  text-align: center; padding: 40px 20px; color: var(--text-dim);
+}
+.empty-icon { font-size: 40px; margin-bottom: 12px; }
+.empty-text { font-size: 14px; line-height: 1.5; }
+
+/* === TOAST === */
+.toast {
+  position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+  background: var(--card); border: 1px solid var(--accent); color: var(--accent);
+  padding: 10px 20px; border-radius: 10px; font-size: 13px; font-weight: 500;
+  z-index: 300; opacity: 0; transition: opacity 0.3s; pointer-events: none;
+}
+.toast.show { opacity: 1; }
+
+/* === LOADING === */
+.loading { text-align: center; padding: 30px; color: var(--text-dim); font-size: 13px; }
+.spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.6s linear infinite; margin-right: 8px; vertical-align: middle; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Sync indicator */
+.sync-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-left: 6px; vertical-align: middle; }
+.sync-dot.synced { background: var(--green); }
+.sync-dot.unsynced { background: var(--text-dim); }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div class="toast" id="toast"></div>
+<div class="drawer-overlay" id="drawer-overlay"></div>
+<div class="drawer" id="drawer"></div>
+<div class="menu-popup" id="menu-popup">
+  <div class="menu-item" onclick="openContacts()"><span class="mi-icon">👤</span> Επαφές (<span id="menu-contact-count">0</span>)</div>
+  <div class="menu-item" onclick="triggerSync()"><span class="mi-icon">🔄</span> iList Sync</div>
+  <div class="menu-item" onclick="reloadAll()"><span class="mi-icon">↻</span> Ανανέωση</div>
+</div>
+
+<script>
+// ===== CONFIG =====
+const SB = 'https://gdirlkqsusgaeryfldmd.supabase.co';
+const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdkaXJsa3FzdXNnYWVyeWZsZG1kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEzOTQ4ODIsImV4cCI6MjA4Njk3MDg4Mn0.94sLCjdNBk1b2XFVwN9byv756qSZydt5ihE16VmY8Yw';
+const N8N_SYNC = 'https://thanos.app.n8n.cloud/webhook/mesity-ilist-sync';
+
+// ===== TELEGRAM =====
+const tg = window.Telegram?.WebApp;
+if (tg) { tg.ready(); tg.expand(); }
+
+// ===== STATE =====
+let state = {
+  tab: 'properties',
+  search: '',
+  filter: 'all',
+  contacts: [],
+  properties: [],
+  requirements: [],
+  matches: [],
+  followUps: [],
+  activities: [],
+  viewings: [],
+  loaded: false,
+  menuOpen: false,
+  drawerMode: null, // 'contacts' | 'contact-detail'
+  selectedContact: null,
+};
+
+// ===== SUPABASE HELPERS =====
+async function sbGet(table, params = '') {
+  const res = await fetch(`${SB}/rest/v1/${table}?${params}`, {
+    headers: { 'apikey': KEY, 'Authorization': `Bearer ${KEY}` }
+  });
+  if (!res.ok) throw new Error(`${table}: ${res.status}`);
+  return res.json();
+}
+async function sbPatch(table, id, body) {
+  const res = await fetch(`${SB}/rest/v1/${table}?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: {
+      'apikey': KEY, 'Authorization': `Bearer ${KEY}`,
+      'Content-Type': 'application/json', 'Prefer': 'return=representation'
+    },
+    body: JSON.stringify(body)
+  });
+  return res.json();
+}
+
+// ===== LOAD DATA =====
+async function loadAll() {
+  state.loaded = false;
+  render();
+  try {
+    const [contacts, properties, requirements, matches, followUps, activities] = await Promise.all([
+      sbGet('re_contacts', 'select=*&order=full_name.asc'),
+      sbGet('re_properties', 'select=*&order=created_at.desc&limit=500'),
+      sbGet('re_client_requirements', 'select=*&order=created_at.desc'),
+      sbGet('re_property_matches', 'select=*&order=overall_score.desc'),
+      sbGet('re_follow_ups', 'select=*&status=neq.completed&order=due_date.asc,due_time.asc'),
+      sbGet('contact_activities', 'select=*&order=created_at.desc&limit=100'),
+    ]);
+    state.contacts = contacts;
+    state.properties = properties;
+    state.requirements = requirements;
+    state.matches = matches;
+    state.followUps = followUps;
+    state.activities = activities;
+    state.loaded = true;
+    document.getElementById('menu-contact-count').textContent = contacts.length;
+  } catch (e) {
+    console.error('Load error:', e);
+    state.loaded = true;
+  }
+  render();
+}
+
+// ===== HELPERS =====
+function contactName(id) {
+  const c = state.contacts.find(x => x.id === id);
+  return c ? c.full_name : '—';
+}
+function propTitle(p) {
+  const parts = [];
+  if (p.property_type) parts.push(p.property_type);
+  if (p.sqm) parts.push(p.sqm + 'τμ');
+  if (p.price) parts.push('€' + Number(p.price).toLocaleString('el'));
+  if (p.area) parts.push(p.area);
+  return parts.join(' · ') || p.title || 'Ακίνητο';
+}
+function statusBadge(s) {
+  if (!s) return '';
+  const map = {
+    'Διαθέσιμο': 'badge-green', 'available': 'badge-green',
+    'Κρατημένο': 'badge-yellow', 'reserved': 'badge-yellow',
+    'Πωλημένο': 'badge-red', 'sold': 'badge-red',
+    'Ενοικιασμένο': 'badge-blue', 'rented': 'badge-blue',
+    'active': 'badge-green', 'inactive': 'badge-red',
+  };
+  return `<span class="badge ${map[s] || 'badge-blue'}">${s}</span>`;
+}
+function fuTypeIcon(t) {
+  const map = { 'call': '📞', 'email': '✉️', 'meeting': '📅', 'viewing': '🏠', 'task': '✅', 'follow_up': '🔔' };
+  return map[t] || '📋';
+}
+function fuUrgencyClass(d) {
+  if (!d) return 'future';
+  const today = new Date().toISOString().split('T')[0];
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+  if (d < today) return 'urgent';
+  if (d === today) return 'today';
+  if (d === tomorrow) return 'tomorrow';
+  return 'future';
+}
+function scoreColor(s) {
+  if (s >= 8) return 'var(--green)';
+  if (s >= 6) return 'var(--blue)';
+  if (s >= 4) return 'var(--yellow)';
+  return 'var(--red)';
+}
+function haptic(type) { try { tg?.HapticFeedback?.impactOccurred(type || 'light'); } catch(e){} }
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ===== ACTIONS =====
+async function completeFollowUp(id) {
+  haptic('medium');
+  try {
+    await sbPatch('re_follow_ups', id, { status: 'completed', completed_at: new Date().toISOString() });
+    state.followUps = state.followUps.filter(f => f.id !== id);
+    render();
+    toast('Ολοκληρώθηκε ✓');
+    if (tg) tg.HapticFeedback?.notificationOccurred('success');
+  } catch (e) { toast('Σφάλμα: ' + e.message); }
+}
+
+async function triggerSync() {
+  closeMenu();
+  haptic('medium');
+  toast('Ξεκίνησε sync...');
+  try {
+    const userId = tg?.initDataUnsafe?.user?.id;
+    const resp = await fetch(N8N_SYNC, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ trigger: 'mini_app', user: userId || 'unknown' })
+    });
+    const result = await resp.json();
+    toast(`Sync: ${result.counts?.contacts || 0} επαφές, ${result.counts?.estates || 0} ακίνητα`);
+    if (tg) tg.HapticFeedback?.notificationOccurred('success');
+    setTimeout(() => loadAll(), 1500);
+  } catch (e) { toast('Sync αποτυχία: ' + e.message); }
+}
+
+function reloadAll() {
+  closeMenu();
+  haptic('light');
+  toast('Ανανέωση...');
+  loadAll();
+}
+
+// ===== MENU =====
+function toggleMenu() {
+  state.menuOpen = !state.menuOpen;
+  document.getElementById('menu-popup').classList.toggle('show', state.menuOpen);
+  haptic('light');
+}
+function closeMenu() {
+  state.menuOpen = false;
+  document.getElementById('menu-popup').classList.remove('show');
+}
+
+// ===== DRAWER =====
+function openContacts() {
+  closeMenu();
+  state.drawerMode = 'contacts';
+  state.selectedContact = null;
+  renderDrawer();
+  document.getElementById('drawer-overlay').classList.add('open');
+  document.getElementById('drawer').classList.add('open');
+  if (tg) tg.BackButton?.show();
+}
+function openContactDetail(id) {
+  state.selectedContact = state.contacts.find(c => c.id === id);
+  state.drawerMode = 'contact-detail';
+  renderDrawer();
+  haptic('light');
+}
+function closeDrawer() {
+  document.getElementById('drawer-overlay').classList.remove('open');
+  document.getElementById('drawer').classList.remove('open');
+  state.drawerMode = null;
+  state.selectedContact = null;
+  if (tg) tg.BackButton?.hide();
+}
+document.getElementById('drawer-overlay').addEventListener('click', closeDrawer);
+
+// ===== BACK BUTTON (Telegram) =====
+if (tg) {
+  tg.BackButton?.onClick(() => {
+    if (state.drawerMode === 'contact-detail') {
+      state.drawerMode = 'contacts';
+      state.selectedContact = null;
+      renderDrawer();
+    } else if (state.drawerMode === 'contacts') {
+      closeDrawer();
+    } else {
+      tg.close();
+    }
+  });
+}
+
+// ===== RENDER DRAWER =====
+function renderDrawer() {
+  const el = document.getElementById('drawer');
+  if (state.drawerMode === 'contacts') {
+    el.innerHTML = `
+      <div class="drawer-header">
+        <h2 style="font-size:20px">👤 Επαφές</h2>
+        <div class="drawer-close" onclick="closeDrawer()">✕</div>
+      </div>
+      <div class="search-bar" style="padding:0 0 12px">
+        <input id="contact-search" placeholder="Αναζήτηση επαφής..." oninput="renderContactList()">
+      </div>
+      <div id="contact-list"></div>`;
+    renderContactList();
+  } else if (state.drawerMode === 'contact-detail' && state.selectedContact) {
+    const c = state.selectedContact;
+    const reqs = state.requirements.filter(r => r.contact_id === c.id);
+    const acts = state.activities.filter(a => a.contact_id === c.id);
+    const pipe = c.pipeline_stage || 'Νέο Lead';
+    el.innerHTML = `
+      <div class="drawer-header">
+        <div style="cursor:pointer;color:var(--accent);font-size:14px" onclick="state.drawerMode='contacts';state.selectedContact=null;renderDrawer()">← Πίσω</div>
+        <div class="drawer-close" onclick="closeDrawer()">✕</div>
+      </div>
+      <div class="contact-detail">
+        <div class="cd-name">${c.full_name || '—'}</div>
+        <div style="margin-bottom:8px">${statusBadge(pipe)} ${c.ilist_id ? '<span class="sync-dot synced" title="Synced"></span>' : '<span class="sync-dot unsynced" title="Not synced"></span>'}</div>
+        <div class="cd-info">
+          ${c.phone ? `<div class="cd-row">📞 <a href="tel:${c.phone}">${c.phone}</a></div>` : ''}
+          ${c.email ? `<div class="cd-row">✉️ <a href="mailto:${c.email}">${c.email}</a></div>` : ''}
+          ${c.contact_type ? `<div class="cd-row">🏷 ${c.contact_type}</div>` : ''}
+          ${c.lead_source ? `<div class="cd-row">📥 ${c.lead_source}</div>` : ''}
+          ${c.ilist_id ? `<div class="cd-row">🔗 iList #${c.ilist_id}</div>` : ''}
+        </div>
+        ${c.notes ? `<div style="font-size:13px;color:var(--text-dim);margin-top:8px;padding:10px;background:var(--card);border-radius:8px">${c.notes}</div>` : ''}
+
+        <div class="cd-section">
+          <div class="cd-section-title">Ζητήσεις (${reqs.length})</div>
+          ${reqs.length ? reqs.map(r => `
+            <div class="list-item" style="margin-bottom:6px">
+              <div style="font-size:13px;font-weight:500">${r.requirement_type || 'Ζήτηση'} ${r.preferred_areas ? '· ' + (Array.isArray(r.preferred_areas) ? r.preferred_areas.join(', ') : r.preferred_areas) : ''}</div>
+              <div class="li-meta">
+                ${r.budget_min || r.budget_max ? `<span>€${(r.budget_min||0).toLocaleString('el')}–${(r.budget_max||0).toLocaleString('el')}</span>` : ''}
+                ${r.sqm_min ? `<span>${r.sqm_min}${r.sqm_max ? '–'+r.sqm_max : '+'}τμ</span>` : ''}
+              </div>
+            </div>
+          `).join('') : '<div class="empty-state" style="padding:16px"><div class="empty-text">Δεν υπάρχουν ζητήσεις</div></div>'}
+        </div>
+
+        <div class="cd-section">
+          <div class="cd-section-title">Ιστορικό (${acts.length})</div>
+          ${acts.length ? acts.slice(0,10).map(a => `
+            <div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:12px">
+              <div style="color:var(--text-dim)">${a.activity_type || 'note'} · ${new Date(a.created_at).toLocaleDateString('el')}</div>
+              <div style="margin-top:2px">${a.raw_text || a.extracted_notes || '—'}</div>
+            </div>
+          `).join('') : '<div class="empty-state" style="padding:16px"><div class="empty-text">Δεν υπάρχει ιστορικό</div></div>'}
+        </div>
+      </div>`;
+  }
+}
+
+function renderContactList() {
+  const q = (document.getElementById('contact-search')?.value || '').toLowerCase();
+  const filtered = state.contacts.filter(c => {
+    const name = (c.full_name || '').toLowerCase();
+    const phone = (c.phone || '').toLowerCase();
+    return name.includes(q) || phone.includes(q);
+  });
+  const el = document.getElementById('contact-list');
+  if (!el) return;
+  el.innerHTML = filtered.map(c => `
+    <div class="list-item" onclick="openContactDetail('${c.id}')">
+      <div class="li-top">
+        <div>
+          <div style="font-size:14px;font-weight:500">${c.full_name || '—'}</div>
+          <div class="li-meta">${c.phone || ''} ${c.contact_type ? '· '+c.contact_type : ''}</div>
+        </div>
+        ${c.ilist_id ? '<span class="sync-dot synced"></span>' : ''}
+      </div>
+    </div>
+  `).join('') || '<div class="empty-state"><div class="empty-text">Δεν βρέθηκαν επαφές</div></div>';
+}
+
+// ===== MAIN RENDER =====
+function render() {
+  const app = document.getElementById('app');
+
+  // Header + Stats
+  const stats = [
+    { num: state.properties.length, label: 'Ακίνητα', color: 'var(--blue)' },
+    { num: state.requirements.length, label: 'Ζητήσεις', color: 'var(--yellow)' },
+    { num: state.matches.length, label: 'Υποδείξεις', color: 'var(--purple)' },
+    { num: state.followUps.length, label: 'Next Steps', color: 'var(--orange)' },
+  ];
+
+  let html = `
+    <div class="header">
+      <div class="header-top">
+        <div class="logo">Mesity <span>CRM</span></div>
+        <div class="menu-btn" onclick="toggleMenu()">⋯</div>
+      </div>
+    </div>
+    <div class="stats">
+      ${stats.map(s => `
+        <div class="stat-card">
+          <div class="stat-num" style="color:${s.color}">${s.num}</div>
+          <div class="stat-label">${s.label}</div>
+        </div>
+      `).join('')}
+    </div>
+    <div class="tabs">
+      <div class="tab ${state.tab==='properties'?'active':''}" onclick="switchTab('properties')">🏠 Ακίνητα</div>
+      <div class="tab ${state.tab==='requirements'?'active':''}" onclick="switchTab('requirements')">📋 Ζητήσεις</div>
+      <div class="tab ${state.tab==='matches'?'active':''}" onclick="switchTab('matches')">🎯 Υποδείξεις</div>
+      <div class="tab ${state.tab==='followups'?'active':''}" onclick="switchTab('followups')">⚡ Next Steps</div>
+    </div>`;
+
+  if (!state.loaded) {
+    html += '<div class="loading"><span class="spinner"></span> Φόρτωση δεδομένων...</div>';
+    app.innerHTML = html;
+    return;
+  }
+
+  // Tab content
+  if (state.tab === 'properties') html += renderProperties();
+  else if (state.tab === 'requirements') html += renderRequirements();
+  else if (state.tab === 'matches') html += renderMatches();
+  else if (state.tab === 'followups') html += renderFollowUps();
+
+  app.innerHTML = html;
+}
+
+function switchTab(t) { state.tab = t; state.search = ''; state.filter = 'all'; render(); haptic('light'); }
+
+// ===== TAB: PROPERTIES =====
+function renderProperties() {
+  const statusFilters = ['all', 'Διαθέσιμο', 'Κρατημένο', 'Πωλημένο'];
+  let items = state.properties;
+  const q = state.search.toLowerCase();
+  if (q) items = items.filter(p =>
+    (p.ilist_id && String(p.ilist_id).includes(q)) ||
+    (p.area||'').toLowerCase().includes(q) ||
+    (p.property_type||'').toLowerCase().includes(q) ||
+    (p.title||'').toLowerCase().includes(q)
+  );
+  if (state.filter !== 'all') items = items.filter(p => p.status === state.filter);
+
+  return `
+    <div class="search-bar">
+      <input placeholder="Αναζήτηση κωδικού, περιοχής, τύπου..." value="${state.search}" oninput="state.search=this.value;render()">
+    </div>
+    <div class="filters">
+      ${statusFilters.map(f => `<div class="chip ${state.filter===f?'active':''}" onclick="state.filter='${f}';render()">${f==='all'?'Όλα':f}</div>`).join('')}
+    </div>
+    <div class="content">
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:8px">${items.length} ακίνητα</div>
+      ${items.slice(0, 100).map(p => `
+        <div class="list-item">
+          <div class="li-top">
+            ${p.ilist_id ? `<span class="li-code">#${p.ilist_id}</span>` : ''}
+            ${statusBadge(p.status)}
+          </div>
+          <div class="li-title">${propTitle(p)}</div>
+          <div class="li-meta">
+            ${p.listing_type ? `<span>${p.listing_type}</span>` : ''}
+            ${p.bedrooms ? `<span>${p.bedrooms} υ/δ</span>` : ''}
+            ${p.ilist_synced_at ? '<span class="sync-dot synced"></span>' : ''}
+          </div>
+        </div>
+      `).join('')}
+      ${items.length > 100 ? `<div style="text-align:center;color:var(--text-dim);padding:16px;font-size:12px">+${items.length-100} ακόμα...</div>` : ''}
+      ${items.length === 0 ? '<div class="empty-state"><div class="empty-icon">🏠</div><div class="empty-text">Δεν βρέθηκαν ακίνητα</div></div>' : ''}
+    </div>`;
+}
+
+// ===== TAB: REQUIREMENTS =====
+function renderRequirements() {
+  let items = state.requirements;
+  const q = state.search.toLowerCase();
+  if (q) items = items.filter(r =>
+    contactName(r.contact_id).toLowerCase().includes(q) ||
+    (r.preferred_areas||'').toString().toLowerCase().includes(q)
+  );
+
+  return `
+    <div class="search-bar">
+      <input placeholder="Αναζήτηση πελάτη, περιοχής..." value="${state.search}" oninput="state.search=this.value;render()">
+    </div>
+    <div class="content">
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:8px">${items.length} ζητήσεις</div>
+      ${items.map(r => {
+        const areas = Array.isArray(r.preferred_areas) ? r.preferred_areas.join(', ') : (r.preferred_areas || '');
+        return `
+        <div class="list-item">
+          <div class="li-top">
+            ${r.ilist_id ? `<span class="li-code">#${r.ilist_id}</span>` : ''}
+            <span class="badge badge-blue">${r.requirement_type || 'Αγορά'}</span>
+          </div>
+          <div class="li-title">${contactName(r.contact_id)}</div>
+          <div class="li-meta">
+            ${areas ? `<span>📍 ${areas}</span>` : ''}
+            ${r.budget_min || r.budget_max ? `<span>💰 €${(r.budget_min||0).toLocaleString('el')}–${(r.budget_max||0).toLocaleString('el')}</span>` : ''}
+            ${r.sqm_min ? `<span>📐 ${r.sqm_min}${r.sqm_max?'-'+r.sqm_max:''}τμ</span>` : ''}
+            ${r.bedrooms_min ? `<span>🛏 ${r.bedrooms_min}+ υ/δ</span>` : ''}
+          </div>
+        </div>`;
+      }).join('')}
+      ${items.length === 0 ? '<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">Δεν βρέθηκαν ζητήσεις</div></div>' : ''}
+    </div>`;
+}
+
+// ===== TAB: MATCHES =====
+function renderMatches() {
+  if (state.matches.length === 0) {
+    return `<div class="content"><div class="empty-state">
+      <div class="empty-icon">🎯</div>
+      <div class="empty-text">Δεν υπάρχουν υποδείξεις ακόμα<br><span style="font-size:12px;color:var(--text-dim)">Θα δημιουργηθούν αυτόματα από AI matching</span></div>
+    </div></div>`;
+  }
+  return `<div class="content">
+    ${state.matches.map(m => {
+      const sc = m.overall_score || 0;
+      return `
+      <div class="match-card">
+        <div class="match-top">
+          <div class="score-circle" style="background:${scoreColor(sc)}20;color:${scoreColor(sc)};border:2px solid ${scoreColor(sc)}">${sc.toFixed(1)}</div>
+          <div class="match-info">
+            <div style="font-size:14px;font-weight:500">${contactName(m.contact_id)}</div>
+            <div class="li-meta" style="margin-top:4px">
+              ${m.price_score ? `<span>💰 ${m.price_score.toFixed(1)}</span>` : ''}
+              ${m.location_score ? `<span>📍 ${m.location_score.toFixed(1)}</span>` : ''}
+              ${m.features_score ? `<span>🏠 ${m.features_score.toFixed(1)}</span>` : ''}
+            </div>
+          </div>
+        </div>
+        ${m.match_reasoning ? `<div class="match-reason">${m.match_reasoning}</div>` : ''}
+        ${m.pros ? `<div style="font-size:12px;margin-top:6px;color:var(--green)">✓ ${Array.isArray(m.pros)?m.pros.join(', '):m.pros}</div>` : ''}
+        ${m.cons ? `<div style="font-size:12px;margin-top:2px;color:var(--red)">✗ ${Array.isArray(m.cons)?m.cons.join(', '):m.cons}</div>` : ''}
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+// ===== TAB: FOLLOW-UPS =====
+function renderFollowUps() {
+  if (state.followUps.length === 0) {
+    return `<div class="content"><div class="empty-state">
+      <div class="empty-icon">⚡</div>
+      <div class="empty-text">Κανένα εκκρεμές follow-up<br><span style="font-size:12px;color:var(--text-dim)">Δημιουργήστε μέσω voice/text commands</span></div>
+    </div></div>`;
+  }
+  return `<div class="content">
+    ${state.followUps.map(f => {
+      const urg = fuUrgencyClass(f.due_date);
+      const urgLabel = { urgent: 'Εκπρόθεσμο', today: 'Σήμερα', tomorrow: 'Αύριο', future: f.due_date || '' };
+      return `
+      <div class="fu-card ${urg}">
+        <div class="fu-header">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="fu-type">${fuTypeIcon(f.follow_up_type)}</span>
+            <div>
+              <div style="font-size:14px;font-weight:500">${f.title || f.follow_up_type || 'Follow-up'}</div>
+              <div class="li-meta">${urgLabel[urg] || f.due_date} ${f.due_time ? '· '+f.due_time : ''}</div>
+            </div>
+          </div>
+          <button class="complete-btn" onclick="event.stopPropagation();completeFollowUp('${f.id}')">✓ Οηοκλήρωση</button>
+        </div>
+        ${f.notes ? `<div style="font-size:12px;color:var(--text-dim);margin-top:8px">${f.notes}</div>` : ''}
+        <div class="li-meta" style="margin-top:6px">
+          ${f.contact_id ? `<span>👤 ${contactName(f.contact_id)}</span>` : ''}
+        </div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+// Close menu on outside click
+document.addEventListener('click', (e) => {
+  if (state.menuOpen && !e.target.closest('.menu-popup') && !e.target.closest('.menu-btn')) closeMenu();
+});
+
+// ===== INIT =====
+loadAll();
+</script>
+</body>
+</html>
