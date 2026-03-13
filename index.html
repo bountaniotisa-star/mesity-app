@@ -289,8 +289,8 @@
       selectedPropertyEnrichment: null,
       selectedRequirement: null,
       myPropertiesOnly: false,
-      competitionData: {},
-      propertyMatches: {},
+      competitionData: {},     // keyed by property_id → array of re_property_competition rows
+      requirementMatches: {},  // keyed by requirement_id → { portfolio:[], privateAds:[], market:[] }
     };
 
     // ===== VOICE STATE =====
@@ -319,16 +319,34 @@
     async function loadAll() {
       state.loaded = false; render();
       try {
-        const [contacts, properties, requirements, followUps, activities, viewings] = await Promise.all([
-          sbGet('re_contacts',            'select=*&order=full_name.asc'),
-          sbGet('re_properties',          'select=*&order=created_at.desc&limit=500'),
-          sbGet('re_client_requirements', 'select=*&order=created_at.desc'),
-          sbGet('re_follow_ups',          'select=*&status=neq.completed&order=due_date.asc,due_time.asc'),
-          sbGet('contact_activities',     'select=*&order=created_at.desc&limit=200'),
-          sbGet('re_property_viewings',   'select=*&order=viewing_date.desc'),
+        const [contacts, properties, requirements, followUps, activities, viewings, reqMatches, compData] = await Promise.all([
+          sbGet('re_contacts',              'select=*&order=full_name.asc'),
+          sbGet('re_properties',            'select=*&order=created_at.desc&limit=500'),
+          sbGet('re_client_requirements',   'select=*&order=created_at.desc'),
+          sbGet('re_follow_ups',            'select=*&status=neq.completed&order=due_date.asc,due_time.asc'),
+          sbGet('contact_activities',       'select=*&order=created_at.desc&limit=200'),
+          sbGet('re_property_viewings',     'select=*&order=viewing_date.desc'),
+          sbGet('re_requirement_matches',   'select=*&order=match_score.desc.nullslast').catch(()=>[]),
+          sbGet('re_property_competition',  'select=*').catch(()=>[]),
         ]);
         state.contacts=contacts; state.properties=properties; state.requirements=requirements;
         state.followUps=followUps; state.activities=activities; state.viewings=viewings;
+        // Index competition data by property_id
+        state.competitionData = {};
+        for (const row of (compData||[])) {
+          const key = String(row.property_id);
+          if (!state.competitionData[key]) state.competitionData[key] = [];
+          state.competitionData[key].push(row);
+        }
+        // Index requirement matches by requirement_id, split by source_db
+        state.requirementMatches = {};
+        for (const row of (reqMatches||[])) {
+          const key = String(row.requirement_id);
+          if (!state.requirementMatches[key]) state.requirementMatches[key] = { portfolio:[], privateAds:[], market:[] };
+          if (row.source_db === 'optimus' || row.source === 'portfolio') state.requirementMatches[key].portfolio.push(row);
+          else if (row.source_db === 'private_ads' || row.source === 'private_ad') state.requirementMatches[key].privateAds.push(row);
+          else state.requirementMatches[key].market.push(row);
+        }
         state.loaded = true;
         document.getElementById('menu-contact-count').textContent = contacts.length;
       } catch(e) { console.error(e); state.loaded = true; }
@@ -597,6 +615,7 @@
       const acts=actsForCont(r.contact_id);
       const ds=r.difficulty_score||0;
       const portfolio=portfolioMatch(r);
+      const enrichedMatches=state.requirementMatches[String(r.id)]||{portfolio:[],privateAds:[],market:[]};
 
       const timelineHtml=acts.length?`<div class="timeline">${acts.map(a=>{const t=(a.activity_type||'').toLowerCase();const dc=t.includes('voice')?'voice':t.includes('view')?'viewing':'text';return`<div class="timeline-item"><div class="tl-dot ${dc}"></div><div class="tl-content"><div class="tl-meta"><span class="badge badge-blue" style="font-size:9px">${a.activity_type||'note'}</span><span>${fmtDate(a.created_at)}</span></div><div class="tl-text">${a.raw_text||a.extracted_notes||'—'}</div></div></div>`;}).join('')}</div>`:`<div style="font-size:12px;color:var(--text-dim);padding:6px 0">Δεν υπάρχει ιστορικό ακόμα</div>`;
 
@@ -631,13 +650,13 @@
       </div>
 
       <div class="detail-section">
-        <div class="proposals-heading" style="color:var(--green)"><span>⚡ Αγγελίες Ιδιωτών</span><span style="font-size:10px;color:var(--text-dim);font-weight:400">Από COWORK-2</span></div>
-        <div class="placeholder-section">Ιδιωτικές αγγελίες που ταιριάζουν θα εμφανιστούν εδώ μετά το COWORK-2 enrichment pipeline (seller_type = 'Ιδιώτης').</div>
+        <div class="proposals-heading" style="color:var(--green)"><span>⚡ Αγγελίες Ιδιωτών (${enrichedMatches.privateAds.length})</span></div>
+        ${enrichedMatches.privateAds.length?enrichedMatches.privateAds.map(m=>`<div class="proposal-card"${m.source_url?` onclick="window.open('${m.source_url}','_blank')"`:''}><div class="proposal-title">${m.title||m.area||'Ιδιωτική Αγγελία'}</div><div class="proposal-meta">${m.price?`<span>€${Number(m.price).toLocaleString('el-GR')}</span>`:''} ${m.sqm?`<span>${m.sqm}τμ</span>`:''} ${m.bedrooms?`<span>${m.bedrooms}υ/δ</span>`:''} ${m.phone_numbers?`<span style="color:var(--green)">📞 ${m.phone_numbers}</span>`:''} ${m.seller_type?`<span class="badge badge-green" style="font-size:9px">${m.seller_type}</span>`:''}</div></div>`).join(''):`<div class="placeholder-section">${state.requirementMatches[String(r.id)]?'Δεν βρέθηκαν ιδιωτικές αγγελίες για αυτά τα κριτήρια.':'Εκτελέστε το COWORK-2 enrichment pipeline για να δείτε ιδιωτικές αγγελίες.'}</div>`}
       </div>
 
       <div class="detail-section">
-        <div class="proposals-heading" style="color:var(--purple);cursor:pointer" onclick="toggleHidden('mkt-${r.id}')"><span>📊 Από την αγορά →</span><span class="chevron" id="ch-mkt-${r.id}">▾</span></div>
-        <div id="mkt-${r.id}" style="display:none"><div class="placeholder-section">Προτάσεις από Spitogatos DB (άλλα μεσιτικά) — θα εμφανιστούν μετά το COWORK-2.</div></div>
+        <div class="proposals-heading" style="color:var(--purple);cursor:pointer" onclick="toggleHidden('mkt-${r.id}')"><span>📊 Από την αγορά (${enrichedMatches.market.length})</span><span class="chevron" id="ch-mkt-${r.id}">▾</span></div>
+        <div id="mkt-${r.id}" style="display:none">${enrichedMatches.market.length?enrichedMatches.market.map(m=>`<div class="proposal-card"${m.source_url?` onclick="window.open('${m.source_url}','_blank')"`:''}><div class="proposal-title">${m.title||m.area||'Αγγελία Αγοράς'}</div><div class="proposal-meta">${m.price?`<span>€${Number(m.price).toLocaleString('el-GR')}</span>`:''} ${m.sqm?`<span>${m.sqm}τμ</span>`:''} ${m.agent_name?`<span>👤 ${m.agent_name}</span>`:''} ${m.days_on_market?`<span>${m.days_on_market}μ</span>`:''}</div></div>`).join(''):`<div class="placeholder-section">${state.requirementMatches[String(r.id)]?'Δεν βρέθηκαν αγγελίες στην αγορά.':'Εκτελέστε το COWORK-2 pipeline για αποτελέσματα αγοράς.'}</div>`}</div>
       </div>
 
       <div class="detail-section">
