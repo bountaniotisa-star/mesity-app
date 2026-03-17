@@ -231,6 +231,8 @@
     .sync-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-left: 4px; vertical-align: middle; }
     .sync-dot.synced { background: var(--green); }
     .sync-dot.unsynced { background: var(--text-dim); }
+  .sort-dropdown { background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: 13px; cursor: pointer; margin-left: auto; }
+  .spitogatos-btn { background: var(--purple); border-radius: 10px; padding: 10px 16px; font-size: 14px; color: #fff; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
   </style>
 </head>
 <body>
@@ -273,6 +275,8 @@
     // ===== STATE =====
     let state = {
       tab: 'properties',
+    propertiesSort: 'desc',
+    requirementsSort: 'desc',
       search: '',
       filter: 'all',
       contacts: [],
@@ -380,7 +384,12 @@
     function fuUrgency(d){ if(!d)return'future'; const t=new Date().toISOString().split('T')[0]; const tm=new Date(Date.now()+86400000).toISOString().split('T')[0]; if(d<t)return'urgent'; if(d===t)return'today'; if(d===tm)return'tomorrow'; return'future'; }
     function fmtDate(dt){ if(!dt)return''; return new Date(dt).toLocaleDateString('el-GR',{day:'numeric',month:'short'}); }
 
-    function haptic(t){ try{tg?.HapticFeedback?.impactOccurred(t||'light');}catch(e){} }
+    function updateSort(tab,order){
+  if(tab==='properties')state.propertiesSort=order;
+  if(tab==='requirements')state.requirementsSort=order;
+  render();haptic('light');
+}
+function haptic(t){ try{tg?.HapticFeedback?.impactOccurred(t||'light');}catch(e){} }
     function toast(msg){ const el=document.getElementById('toast'); el.textContent=msg; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),2500); }
 
     function viewingsForProp(id)   { return state.viewings.filter(v=>String(v.property_id)===String(id)); }
@@ -581,7 +590,7 @@
         <div class="detail-section-title">🔗 Links &amp; CMA</div>
         <div class="action-btns">
           ${p.cma_report_url?`<a class="action-btn cma" href="${p.cma_report_url}" target="_blank">📊 CMA Report</a>`:`<div class="action-btn cma disabled">📊 CMA Report</div>`}
-          ${p.spitogatos_url?`<a class="action-btn spitogatos" href="${p.spitogatos_url}" target="_blank">🔗 Spitogatos</a>`:`<div class="action-btn spitogatos disabled">🔗 Spitogatos</div>`}
+          ${p.spitogatos_url?`<a class="action-btn spitogatos" href="${p.spitogatos_url}" target="_blank">🔗 Spitogatos</a>`:`<div class="action-btn spitogatos-btn">🔗 Spitogatos</div>`}
         </div>
       </div>
 
@@ -715,10 +724,11 @@
       <div class="search-bar"><input placeholder="Αναζήτηση κωδικού, περιοχής, τύπου..." value="${state.search}" oninput="state.search=this.value;render()"></div>
       <div class="filters">
         ${[{k:'all',l:'Όλα'},{k:'mine',l:'👤 Τα δικά μου'},{k:'Διαθέσιμο',l:'Διαθέσιμο'},{k:'Κρατημένο',l:'Κρατημένο'}].map(c=>`<div class="chip ${state.filter===c.k?'active':''}" onclick="state.filter='${c.k}';render()">${c.l}</div>`).join('')}
+      <select class="sort-dropdown" onchange="updateSort('properties',this.value)"><option value="desc">Πρόσφατα ↓</option><option value="asc">Παλαιότερα ↑</option></select>
       </div>
       <div class="content">
         <div style="font-size:12px;color:var(--text-dim);margin-bottom:8px">${items.length} ακίνητα</div>
-        ${items.slice(0,100).map(p=>{
+        ${[...items].sort((a,b)=>state.propertiesSort==='desc'?new Date(b.updated_at)-new Date(a.updated_at):new Date(a.updated_at)-new Date(b.updated_at)).slice(0,100).map(p=>{
           const isMine=String(p.agent_ilist_id)===MY_AGENT_ID; const vcnt=viewingsForProp(p.id).length;
           return`<div class="list-item" onclick="openPropertyDetail('${p.id}')">
             <div class="li-top">${p.ilist_id?`<span class="li-code">#${p.ilist_id}</span>`:'<span></span>'}<div>${renderStars(p.competitiveness_score||0)}</div></div>
@@ -738,9 +748,10 @@
       if(q)items=items.filter(r=>contactName(r.contact_id).toLowerCase().includes(q)||(r.preferred_areas||'').toString().toLowerCase().includes(q));
       return`
       <div class="search-bar"><input placeholder="Αναζήτηση πελάτη, περιοχής..." value="${state.search}" oninput="state.search=this.value;render()"></div>
+      <select class="sort-dropdown" onchange="updateSort('requirements',this.value)"><option value="desc">Πρόσφατα ↓</option><option value="asc">Παλαιότερα ↑</option></select>
       <div class="content">
         <div style="font-size:12px;color:var(--text-dim);margin-bottom:8px">${items.length} ζητήσεις</div>
-        ${items.map(r=>{
+        ${[...items].sort((a,b)=>state.requirementsSort==='desc'?new Date(b.updated_at)-new Date(a.updated_at):new Date(a.updated_at)-new Date(b.updated_at)).map(r=>{
           const areas=Array.isArray(r.preferred_areas)?r.preferred_areas:(r.preferred_areas?String(r.preferred_areas).split(',').map(s=>s.trim()).filter(Boolean):[]);
           const ds=r.difficulty_score||0; const isBuy=(r.requirement_type||'').toLowerCase().includes('αγορά')||(r.requirement_type||'').toLowerCase().includes('buy');
           return`<div class="list-item" onclick="openRequirementDetail('${r.id}')">
