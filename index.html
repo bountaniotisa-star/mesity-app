@@ -233,6 +233,9 @@
     .sync-dot.unsynced { background: var(--text-dim); }
   .sort-dropdown { background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: 13px; cursor: pointer; margin-left: auto; }
   .spitogatos-btn { background: var(--purple); border-radius: 10px; padding: 10px 16px; font-size: 14px; color: #fff; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+  .prop-mini-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; cursor: pointer; margin-top: 8px; }
+  .pmc-addr { font-weight: 600; font-size: 14px; color: var(--text); }
+  .pmc-meta { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
   </style>
 </head>
 <body>
@@ -607,6 +610,8 @@ function haptic(t){ try{tg?.HapticFeedback?.impactOccurred(t||'light');}catch(e)
       ${(p.spitogatos_match_score||p.days_on_market)?`<div class="detail-section"><div style="font-size:11px;color:var(--text-dim)">${p.spitogatos_match_score?`Spitogatos match: ${Math.round(p.spitogatos_match_score*100)}%`:''} ${p.days_on_market?`· ${p.days_on_market} μέρες στην αγορά`:''}</div></div>`:''}
 
       <div class="detail-section"><div class="detail-section-title">💬 Ιστορικό ομιλίας</div>${timelineHtml}</div>
+
+${r.trigger_property_id?(()=>{const tp=(state.properties||[]).find(p=>String(p.id)===String(r.trigger_property_id));return tp?`<div class="detail-section"><div class="detail-section-title">🏠 Αφορμή Ζήτησης</div><div class="prop-mini-card" onclick="openPropertyDetail('${tp.id}')"><div class="pmc-addr">${tp.address||tp.area||'Ακίνητο'}</div><div class="pmc-meta">${[tp.area,tp.sq_meters?tp.sq_meters+'τμ':null,tp.price?'€'+Number(tp.price).toLocaleString('el-GR'):null].filter(Boolean).join(' · ')}</div></div></div>`:'';})():''}
 
       <div class="voice-bar-sticky">
         <button class="voice-btn" id="vbtn-property" onclick="toggleRecording('property','${p.id}',null,null)">🎤</button>
