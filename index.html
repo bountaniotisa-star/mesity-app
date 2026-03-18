@@ -683,6 +683,7 @@ function haptic(t){ try{tg?.HapticFeedback?.impactOccurred(t||'light');}catch(e)
 
       <div class="detail-section"><div class="detail-section-title">💬 Ιστορικό ομιλίας</div>${timelineHtml}</div>
 
+      ${r.trigger_property_id?(()=>{const tp=(state.properties||[]).find(p=>String(p.id)===String(r.trigger_property_id));return tp?`<div class="detail-section"><div class="detail-section-title">🏠 Αφορμή Ζήτησης</div><div class="prop-mini-card" onclick="openPropertyDetail('${tp.id}')"><div class="pmc-addr">${tp.address||tp.area||'Ακίνητο'}</div><div class="pmc-meta">${[tp.area,tp.sq_meters?tp.sq_meters+'τμ':null,tp.price?'€'+Number(tp.price).toLocaleString('el-GR'):null].filter(Boolean).join(' · ')}</div></div></div>`:'';})():''}
       <div class="voice-bar-sticky">
         <button class="voice-btn" id="vbtn-requirement" onclick="toggleRecording('requirement',null,'${r.contact_id}','${r.id}')">🎤</button>
         <input class="voice-input" id="vinput-requirement" placeholder="Πες κάτι για αυτή τη ζήτηση... | 'Με τη Κατερίνα κανονίσαμε ραντεβού...'" onkeydown="if(event.key==='Enter'){recordingCtx={type:'requirement',contact_id:'${r.contact_id}',requirement_id:'${r.id}'};sendText('requirement')}">
