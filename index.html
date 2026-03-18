@@ -593,7 +593,7 @@ function haptic(t){ try{tg?.HapticFeedback?.impactOccurred(t||'light');}catch(e)
         <div class="detail-section-title">🔗 Links &amp; CMA</div>
         <div class="action-btns">
           ${p.cma_report_url?`<a class="action-btn cma" href="${p.cma_report_url}" target="_blank">📊 CMA Report</a>`:`<div class="action-btn cma disabled">📊 CMA Report</div>`}
-          ${p.spitogatos_url?`<a class="action-btn spitogatos" href="${p.spitogatos_url}" target="_blank">🔗 Spitogatos</a>`:`<div class="action-btn spitogatos-btn">🔗 Spitogatos</div>`}
+          ${p.spitogatos_url?`<a class="spitogatos-btn" href="${p.spitogatos_url}" target="_blank" onclick="event.stopPropagation(); if(window.Telegram?.WebApp) Telegram.WebApp.HapticFeedback.impactOccurred('light');">🔗 Δες στο Spitogatos</a>`:''}
         </div>
       </div>
 
