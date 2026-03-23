@@ -278,8 +278,8 @@
     // ===== STATE =====
     let state = {
       tab: 'properties',
-    propertiesSort: 'desc',
-    requirementsSort: 'desc',
+    propertiesSort: 'date_desc',
+    requirementsSort: 'date_desc',
       search: '',
       filter: 'all',
       contacts: [],
@@ -388,10 +388,35 @@
     function fmtDate(dt){ if(!dt)return''; return new Date(dt).toLocaleDateString('el-GR',{day:'numeric',month:'short'}); }
 
     function updateSort(tab,order){
-  if(tab==='properties')state.propertiesSort=order;
-  if(tab==='requirements')state.requirementsSort=order;
-  render();haptic('light');
-}
+      if(tab==='properties')state.propertiesSort=order;
+      if(tab==='requirements')state.requirementsSort=order;
+      render();haptic('light');
+    }
+    function sortProperties(items,sortKey){
+      const arr=[...items];
+      if(sortKey==='price_asc')  return arr.sort((a,b)=>Number(a.price||0)-Number(b.price||0));
+      if(sortKey==='price_desc') return arr.sort((a,b)=>Number(b.price||0)-Number(a.price||0));
+      if(sortKey==='sqm_asc')    return arr.sort((a,b)=>Number(a.sqm||0)-Number(b.sqm||0));
+      if(sortKey==='sqm_desc')   return arr.sort((a,b)=>Number(b.sqm||0)-Number(a.sqm||0));
+      if(sortKey==='date_desc')  return arr.sort((a,b)=>new Date(b.updated_at||b.created_at)-new Date(a.updated_at||a.created_at));
+      if(sortKey==='date_asc')   return arr.sort((a,b)=>new Date(a.updated_at||a.created_at)-new Date(b.updated_at||b.created_at));
+      // legacy compat
+      if(sortKey==='desc') return arr.sort((a,b)=>new Date(b.updated_at)-new Date(a.updated_at));
+      if(sortKey==='asc')  return arr.sort((a,b)=>new Date(a.updated_at)-new Date(b.updated_at));
+      return arr;
+    }
+    function sortRequirements(items,sortKey){
+      const arr=[...items];
+      if(sortKey==='budget_asc')  return arr.sort((a,b)=>Number(a.budget_max||a.budget_min||0)-Number(b.budget_max||b.budget_min||0));
+      if(sortKey==='budget_desc') return arr.sort((a,b)=>Number(b.budget_max||b.budget_min||0)-Number(a.budget_max||a.budget_min||0));
+      if(sortKey==='date_desc')   return arr.sort((a,b)=>new Date(b.updated_at||b.created_at)-new Date(a.updated_at||a.created_at));
+      if(sortKey==='date_asc')    return arr.sort((a,b)=>new Date(a.updated_at||a.created_at)-new Date(b.updated_at||b.created_at));
+      if(sortKey==='area')        return arr.sort((a,b)=>{const aA=Array.isArray(a.preferred_areas)?a.preferred_areas.join(','):(a.preferred_areas||'');const bA=Array.isArray(b.preferred_areas)?b.preferred_areas.join(','):(b.preferred_areas||'');return aA.localeCompare(bA,'el');});
+      // legacy compat
+      if(sortKey==='desc') return arr.sort((a,b)=>new Date(b.updated_at)-new Date(a.updated_at));
+      if(sortKey==='asc')  return arr.sort((a,b)=>new Date(a.updated_at)-new Date(b.updated_at));
+      return arr;
+    }
 function haptic(t){ try{tg?.HapticFeedback?.impactOccurred(t||'light');}catch(e){} }
     function toast(msg){ const el=document.getElementById('toast'); el.textContent=msg; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),2500); }
 
@@ -595,6 +620,19 @@ function haptic(t){ try{tg?.HapticFeedback?.impactOccurred(t||'light');}catch(e)
           ${p.cma_report_url?`<a class="action-btn cma" href="${p.cma_report_url}" target="_blank">📊 CMA Report</a>`:`<div class="action-btn cma disabled">📊 CMA Report</div>`}
           ${p.spitogatos_url?`<a class="spitogatos-btn" href="${p.spitogatos_url}" target="_blank" onclick="event.stopPropagation(); if(window.Telegram?.WebApp) Telegram.WebApp.HapticFeedback.impactOccurred('light');">🔗 Δες στο Spitogatos</a>`:''}
         </div>
+        ${(()=>{
+          if(!p.area)return'';
+          const areaSlug=encodeURIComponent((p.area||'').toLowerCase().replace(/\s+/g,'-').replace(/[άα]/g,'a').replace(/[έε]/g,'e').replace(/[ήηιίϊΐ]/g,'i').replace(/[όο]/g,'o').replace(/[ύυύϋΰ]/g,'y').replace(/[ώω]/g,'o'));
+          const price=Number(p.price||0);
+          const sqm=Number(p.sqm||0);
+          const timiApo=price>0?Math.round(price*0.8):'';
+          const timiEws=price>0?Math.round(price*1.2):'';
+          const emvApo=sqm>0?Math.round(sqm*0.85):'';
+          const emvEws=sqm>0?Math.round(sqm*1.15):'';
+          const params=[timiApo?`timiApo=${timiApo}`:'',timiEws?`timiEws=${timiEws}`:'',emvApo?`emvadonApo=${emvApo}`:'',emvEws?`emvadonEws=${emvEws}`:''].filter(Boolean).join('&');
+          const url=`https://www.spitogatos.gr/pwliseis-katoikies/${areaSlug}/${params?'?'+params:''}`;
+          return`<div style="margin-top:8px"><a class="action-btn spitogatos" href="${url}" target="_blank" onclick="haptic('light')">🔍 Βρες στο Spitogatos</a></div>`;
+        })()}
       </div>
 
       <div class="detail-section">
@@ -683,7 +721,18 @@ function haptic(t){ try{tg?.HapticFeedback?.impactOccurred(t||'light');}catch(e)
 
       <div class="detail-section"><div class="detail-section-title">💬 Ιστορικό ομιλίας</div>${timelineHtml}</div>
 
-      ${r.trigger_property_id?(()=>{const tp=(state.properties||[]).find(p=>String(p.id)===String(r.trigger_property_id));return tp?`<div class="detail-section"><div class="detail-section-title">🏠 Αφορμή Ζήτησης</div><div class="prop-mini-card" onclick="openPropertyDetail('${tp.id}')"><div class="pmc-addr">${tp.address||tp.area||'Ακίνητο'}</div><div class="pmc-meta">${[tp.area,tp.sq_meters?tp.sq_meters+'τμ':null,tp.price?'€'+Number(tp.price).toLocaleString('el-GR'):null].filter(Boolean).join(' · ')}</div></div></div>`:'';})():''}
+      <div class="detail-section">
+        <div class="detail-section-title">🏠 Αφορμή Ζήτησης</div>
+        ${(()=>{
+          const tp=r.trigger_property_id?(state.properties||[]).find(p=>String(p.id)===String(r.trigger_property_id)):null;
+          const propHtml=tp?`<div class="prop-mini-card" onclick="openPropertyDetail('${tp.id}')"><div class="pmc-addr">${tp.address||tp.area||'Ακίνητο'}</div><div class="pmc-meta">${[tp.area,tp.sqm?tp.sqm+'τμ':(tp.sq_meters?tp.sq_meters+'τμ':null),tp.price?'€'+Number(tp.price).toLocaleString('el-GR'):null].filter(Boolean).join(' · ')}</div></div>`:r.trigger_property_id?`<div style="font-size:12px;color:var(--text-dim);padding:6px 0">🔗 Linked property ID: ${r.trigger_property_id}</div>`:`<div style="font-size:12px;color:var(--text-dim);padding:6px 0">Δεν έχει οριστεί αφορμή ακινήτου.</div>`;
+          return propHtml;
+        })()}
+        <div style="margin-top:8px">
+          <textarea id="trigger-note-${r.id}" style="width:100%;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;font-family:'DM Sans';padding:8px 10px;resize:none;outline:none;min-height:60px" placeholder="Σημείωση μεσίτη: γιατί αυτό το ακίνητο ήταν η αφορμή..." onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">${r.trigger_note||''}</textarea>
+          <div style="text-align:right;margin-top:4px"><button style="padding:5px 14px;border-radius:8px;background:var(--accent-dim);border:1px solid rgba(52,232,165,0.3);color:var(--accent);font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans'" onclick="(async()=>{const el=document.getElementById('trigger-note-${r.id}');if(!el)return;try{await sbPatch('re_client_requirements','${r.id}',{trigger_note:el.value});toast('Αποθηκεύτηκε ✓');haptic('success');}catch(e){toast('Σφάλμα: '+e.message);}})()">💾 Αποθήκευση</button></div>
+        </div>
+      </div>
       <div class="voice-bar-sticky">
         <button class="voice-btn" id="vbtn-requirement" onclick="toggleRecording('requirement',null,'${r.contact_id}','${r.id}')">🎤</button>
         <input class="voice-input" id="vinput-requirement" placeholder="Πες κάτι για αυτή τη ζήτηση... | 'Με τη Κατερίνα κανονίσαμε ραντεβού...'" onkeydown="if(event.key==='Enter'){recordingCtx={type:'requirement',contact_id:'${r.contact_id}',requirement_id:'${r.id}'};sendText('requirement')}">
@@ -728,11 +777,11 @@ function haptic(t){ try{tg?.HapticFeedback?.impactOccurred(t||'light');}catch(e)
       <div class="search-bar"><input placeholder="Αναζήτηση κωδικού, περιοχής, τύπου..." value="${state.search}" oninput="state.search=this.value;render()"></div>
       <div class="filters">
         ${[{k:'all',l:'Όλα'},{k:'mine',l:'👤 Τα δικά μου'},{k:'Διαθέσιμο',l:'Διαθέσιμο'},{k:'Κρατημένο',l:'Κρατημένο'}].map(c=>`<div class="chip ${state.filter===c.k?'active':''}" onclick="state.filter='${c.k}';render()">${c.l}</div>`).join('')}
-      <select class="sort-dropdown" onchange="updateSort('properties',this.value)"><option value="desc">Πρόσφατα ↓</option><option value="asc">Παλαιότερα ↑</option></select>
+      <select class="sort-dropdown" onchange="updateSort('properties',this.value)">${[{v:'date_desc',l:'Πρόσφατα ↓'},{v:'date_asc',l:'Παλαιότερα ↑'},{v:'price_asc',l:'Τιμή ↑'},{v:'price_desc',l:'Τιμή ↓'},{v:'sqm_asc',l:'Εμβαδόν ↑'},{v:'sqm_desc',l:'Εμβαδόν ↓'}].map(o=>`<option value="${o.v}"${state.propertiesSort===o.v?' selected':''}>${o.l}</option>`).join('')}</select>
       </div>
       <div class="content">
         <div style="font-size:12px;color:var(--text-dim);margin-bottom:8px">${items.length} ακίνητα</div>
-        ${[...items].sort((a,b)=>state.propertiesSort==='desc'?new Date(b.updated_at)-new Date(a.updated_at):new Date(a.updated_at)-new Date(b.updated_at)).slice(0,100).map(p=>{
+        ${sortProperties(items,state.propertiesSort).slice(0,100).map(p=>{
           const isMine=String(p.agent_ilist_id)===MY_AGENT_ID; const vcnt=viewingsForProp(p.id).length;
           return`<div class="list-item" onclick="openPropertyDetail('${p.id}')">
             <div class="li-top">${p.ilist_id?`<span class="li-code">#${p.ilist_id}</span>`:'<span></span>'}<div>${renderStars(p.competitiveness_score||0)}</div></div>
@@ -752,10 +801,10 @@ function haptic(t){ try{tg?.HapticFeedback?.impactOccurred(t||'light');}catch(e)
       if(q)items=items.filter(r=>contactName(r.contact_id).toLowerCase().includes(q)||(r.preferred_areas||'').toString().toLowerCase().includes(q));
       return`
       <div class="search-bar"><input placeholder="Αναζήτηση πελάτη, περιοχής..." value="${state.search}" oninput="state.search=this.value;render()"></div>
-      <select class="sort-dropdown" onchange="updateSort('requirements',this.value)"><option value="desc">Πρόσφατα ↓</option><option value="asc">Παλαιότερα ↑</option></select>
+      <select class="sort-dropdown" onchange="updateSort('requirements',this.value)">${[{v:'date_desc',l:'Πρόσφατα ↓'},{v:'date_asc',l:'Παλαιότερα ↑'},{v:'budget_asc',l:'Budget ↑'},{v:'budget_desc',l:'Budget ↓'},{v:'area',l:'Περιοχή A→Z'}].map(o=>`<option value="${o.v}"${state.requirementsSort===o.v?' selected':''}>${o.l}</option>`).join('')}</select>
       <div class="content">
         <div style="font-size:12px;color:var(--text-dim);margin-bottom:8px">${items.length} ζητήσεις</div>
-        ${[...items].sort((a,b)=>state.requirementsSort==='desc'?new Date(b.updated_at)-new Date(a.updated_at):new Date(a.updated_at)-new Date(b.updated_at)).map(r=>{
+        ${sortRequirements(items,state.requirementsSort).map(r=>{
           const areas=Array.isArray(r.preferred_areas)?r.preferred_areas:(r.preferred_areas?String(r.preferred_areas).split(',').map(s=>s.trim()).filter(Boolean):[]);
           const ds=r.difficulty_score||0; const isBuy=(r.requirement_type||'').toLowerCase().includes('αγορά')||(r.requirement_type||'').toLowerCase().includes('buy');
           return`<div class="list-item" onclick="openRequirementDetail('${r.id}')">
