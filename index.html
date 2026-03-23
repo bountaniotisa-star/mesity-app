@@ -236,6 +236,19 @@
     .push-ilist-btn { width: 100%; padding: 10px; border-radius: 10px; background: rgba(91,138,245,0.13); border: 1px solid rgba(91,138,245,0.35); color: var(--blue); font-size: 13px; font-weight: 600; cursor: pointer; font-family: 'DM Sans'; display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 6px; }
     .push-ilist-btn:active { background: rgba(91,138,245,0.25); }
   .sort-dropdown { background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: 13px; cursor: pointer; margin-left: auto; }
+
+    /* === RECORDING OVERLAY === */
+    .rec-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.88); z-index: 500; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; }
+    .rec-overlay.hidden { display: none; }
+    .rec-dot { width: 22px; height: 22px; border-radius: 50%; background: var(--red); animation: pulse-rec 1s infinite; }
+    .rec-timer { font-size: 42px; font-weight: 700; font-family: 'DM Sans'; color: var(--text); letter-spacing: 3px; }
+    .rec-subtitle { font-size: 13px; color: var(--text-dim); }
+    .rec-stop-btn { padding: 13px 36px; border-radius: 12px; background: var(--red); border: none; color: #fff; font-size: 16px; font-weight: 700; cursor: pointer; font-family: 'DM Sans'; margin-top: 8px; }
+    .rec-stop-btn:active { opacity: 0.85; }
+
+    /* === CONTEXTUAL VOICE NOTE BUTTON === */
+    .ctx-voice-btn { display: inline-flex; align-items: center; gap: 5px; padding: 6px 13px; border-radius: 8px; background: rgba(52,232,165,0.1); border: 1px solid rgba(52,232,165,0.3); color: var(--accent); font-size: 12px; font-weight: 600; cursor: pointer; font-family: 'DM Sans'; transition: background 0.15s; }
+    .ctx-voice-btn:active { background: rgba(52,232,165,0.22); }
   .spitogatos-btn { background: var(--purple); border-radius: 10px; padding: 10px 16px; font-size: 14px; color: #fff; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
   .prop-mini-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; cursor: pointer; margin-top: 8px; }
   .pmc-addr { font-weight: 600; font-size: 14px; color: var(--text); }
@@ -247,6 +260,14 @@
   <div class="toast" id="toast"></div>
   <div class="drawer-overlay" id="drawer-overlay"></div>
   <div class="drawer" id="drawer"></div>
+
+  <!-- Recording overlay -->
+  <div class="rec-overlay hidden" id="rec-overlay">
+    <div class="rec-dot"></div>
+    <div class="rec-timer" id="rec-timer">0:00</div>
+    <div class="rec-subtitle" id="rec-subtitle">Ηχογράφηση...</div>
+    <button class="rec-stop-btn" onclick="stopRecording()">⏹ Σταμάτα</button>
+  </div>
 
   <div class="menu-popup" id="menu-popup">
     <div class="menu-item" onclick="openContacts()"><span class="mi-icon">👤</span> Επαφές (<span id="menu-contact-count">0</span>)</div>
@@ -499,32 +520,79 @@ function haptic(t){ try{tg?.HapticFeedback?.impactOccurred(t||'light');}catch(e)
     if(tg){ tg.BackButton?.onClick(()=>{ if(state.drawerMode==='contact-detail'){state.drawerMode='contacts';state.selectedContact=null;renderDrawer();}else if(state.drawerMode){closeDrawer();}else{tg.close();} }); }
 
     // ===== VOICE =====
+    let recTimerInterval = null;
+    let recAutoStopTimeout = null;
+    let recSeconds = 0;
+
     async function toggleRecording(ctx,propId,contId,reqId){
       if(recorder&&recorder.state==='recording'){stopRecording();return;}
       recordingCtx={type:ctx,property_id:propId||null,contact_id:contId||null,requirement_id:reqId||null};
       await startRecording(ctx);
     }
+
+    // Contextual voice note: scope-aware shortcut
+    async function startContextNote(scope, contactId, requirementId, propertyId){
+      if(recorder&&recorder.state==='recording'){stopRecording();return;}
+      recordingCtx={type:scope,property_id:propertyId||null,contact_id:contactId||null,requirement_id:requirementId||null};
+      await startRecording(scope);
+    }
+
     async function startRecording(ctx){
       try{
         const stream=await navigator.mediaDevices.getUserMedia({audio:true});
         audioChunks=[];
-        const mime=MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')?'audio/ogg;codecs=opus':MediaRecorder.isTypeSupported('audio/webm;codecs=opus')?'audio/webm;codecs=opus':'audio/webm';
+        const mime=MediaRecorder.isTypeSupported('audio/webm;codecs=opus')?'audio/webm;codecs=opus':MediaRecorder.isTypeSupported('audio/webm')?'audio/webm':'audio/ogg;codecs=opus';
         recorder=new MediaRecorder(stream,{mimeType:mime});
         recorder.ondataavailable=e=>{if(e.data.size>0)audioChunks.push(e.data);};
-        recorder.onstop=()=>{stream.getTracks().forEach(t=>t.stop());sendVoice(new Blob(audioChunks,{type:mime}));};
+        recorder.onstop=()=>{stream.getTracks().forEach(t=>t.stop());hideRecOverlay();sendVoice(new Blob(audioChunks,{type:mime}));};
         recorder.start();
+        // Update legacy mic button if present
         const btn=document.getElementById(`vbtn-${ctx}`);
         if(btn){btn.textContent='⏹';btn.classList.add('recording');}
+        // Show recording overlay
+        showRecOverlay(ctx);
         haptic('medium');
+        // Auto-stop after 30s
+        recAutoStopTimeout=setTimeout(()=>stopRecording(),30000);
       }catch(e){toast('Μικρόφωνο: '+e.message);}
     }
+
+    function showRecOverlay(ctx){
+      recSeconds=0;
+      const overlay=document.getElementById('rec-overlay');
+      const timerEl=document.getElementById('rec-timer');
+      const subtitleEl=document.getElementById('rec-subtitle');
+      if(!overlay)return;
+      // Set subtitle by context
+      const labels={global:'Γενική σημείωση',property:'Σημείωση ακινήτου',requirement:'Σημείωση ζήτησης',contact:'Σημείωση επαφής'};
+      if(subtitleEl) subtitleEl.textContent=labels[ctx]||'Ηχογράφηση...';
+      if(timerEl) timerEl.textContent='0:00';
+      overlay.classList.remove('hidden');
+      recTimerInterval=setInterval(()=>{
+        recSeconds++;
+        const m=Math.floor(recSeconds/60);
+        const s=String(recSeconds%60).padStart(2,'0');
+        if(timerEl) timerEl.textContent=`${m}:${s}`;
+      },1000);
+    }
+
+    function hideRecOverlay(){
+      const overlay=document.getElementById('rec-overlay');
+      if(overlay) overlay.classList.add('hidden');
+      clearInterval(recTimerInterval);
+      clearTimeout(recAutoStopTimeout);
+      recTimerInterval=null;recAutoStopTimeout=null;
+    }
+
     function stopRecording(){
       if(recorder&&recorder.state==='recording'){
         recorder.stop();
         const btn=document.getElementById(`vbtn-${recordingCtx?.type}`);
         if(btn){btn.textContent='🎤';btn.classList.remove('recording');}
+        hideRecOverlay();
       }
     }
+
     async function sendVoice(blob){
       try{
         toast('Αποστολή ηχητικού...');
@@ -535,20 +603,25 @@ function haptic(t){ try{tg?.HapticFeedback?.impactOccurred(t||'light');}catch(e)
         const bytes=new Uint8Array(buf);
         let bin=''; bytes.forEach(b=>bin+=String.fromCharCode(b));
         const audio_base64=btoa(bin);
-        const audio_format=blob.type.includes('ogg')?'ogg':'webm';
-        // Entity title for context hint
-        let entity_title=null;
-        if(ctx.type==='property'&&state.selectedProperty) entity_title=propTitle(state.selectedProperty);
-        else if(ctx.type==='requirement'&&state.selectedRequirement) entity_title=contactName(state.selectedRequirement.contact_id);
+        const audio_mimeType=blob.type||'audio/webm';
+        // Build structured context payload per spec
+        const scope=(ctx.type==='global'||!ctx.type)?'general':ctx.type;
         const r=await fetch(N8N_VOICE,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-          input_type:'voice',audio_base64,audio_format,
-          context:ctx.type||'global',chat_id:uid,
-          property_id:ctx.property_id||null,requirement_id:ctx.requirement_id||null,
-          contact_id:ctx.contact_id||null,entity_title
+          input_type:'voice',
+          audio_base64,
+          audio_mimeType,
+          context:{
+            scope,
+            contact_id:ctx.contact_id||null,
+            requirement_id:ctx.requirement_id||null,
+            property_id:ctx.property_id||null
+          },
+          chat_id:uid
         })});
         toast(r.ok?'Καταγράφηκε ✓':'Σφάλμα αποστολής');
-        if(r.ok)haptic('success');
-      }catch(e){toast('Σφάλμα: '+e.message);}
+        if(r.ok){haptic('success');tg?.HapticFeedback?.notificationOccurred('success');}
+        else{tg?.HapticFeedback?.notificationOccurred('error');}
+      }catch(e){toast('Σφάλμα: '+e.message);tg?.HapticFeedback?.notificationOccurred('error');}
     }
     async function sendText(ctx){
       const inp=document.getElementById(`vinput-${ctx}`);if(!inp)return;
@@ -603,6 +676,7 @@ function haptic(t){ try{tg?.HapticFeedback?.impactOccurred(t||'light');}catch(e)
       <div class="cd-name">${c.full_name||'—'}</div><div style="margin-bottom:8px">${statusBadge(c.pipeline_stage||'Νέο Lead')}</div>
       <div class="cd-info">${c.phone?`<div class="cd-row">📞 <a href="tel:${c.phone}">${c.phone}</a></div>`:''} ${c.email?`<div class="cd-row">✉️ <a href="mailto:${c.email}">${c.email}</a></div>`:''} ${c.contact_type?`<div class="cd-row">🏷 ${c.contact_type}</div>`:''} ${c.ilist_id?`<div class="cd-row">🔗 iList #${c.ilist_id}</div>`:''}</div>
       ${!c.ilist_id?`<button class="push-ilist-btn" id="push-ilist-contact-${c.id}" onclick="pushToIList('contact','${c.id}')">📤 Push to iList</button>`:''}
+      <div style="margin-top:10px;margin-bottom:8px"><button class="ctx-voice-btn" onclick="startContextNote('contact','${c.id}',null,null)">🎙️ Σημείωση</button></div>
       <div class="cd-section"><div class="cd-section-title">Ζητήσεις (${reqs.length})</div>${reqs.map(r=>`<div class="list-item" style="margin-bottom:6px"><div style="font-size:13px;font-weight:500">${r.requirement_type||'Ζήτηση'} ${r.preferred_areas?'· '+(Array.isArray(r.preferred_areas)?r.preferred_areas.join(', '):r.preferred_areas):''}</div><div class="li-meta">${r.budget_max?'€'+(r.budget_min||0).toLocaleString('el-GR')+'–'+Number(r.budget_max).toLocaleString('el-GR'):''}</div></div>`).join('')||'<div class="li-meta">—</div>'}</div>
       <div class="cd-section"><div class="cd-section-title">Ιστορικό (${acts.length})</div>${acts.slice(0,10).map(a=>`<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:12px"><div style="color:var(--text-dim)">${a.activity_type||'note'} · ${fmtDate(a.created_at)}</div><div style="margin-top:2px">${a.raw_text||a.extracted_notes||'—'}</div></div>`).join('')||'<div class="li-meta">—</div>'}</div>`;
     }
@@ -630,6 +704,9 @@ function haptic(t){ try{tg?.HapticFeedback?.impactOccurred(t||'light');}catch(e)
         <div class="detail-header-sub">${propSubtitle(p)}</div>
         <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px">${statusBadge(p.status)} ${eBadge} ${isMine?'<span class="badge badge-orange">Τα δικά μου</span>':''} ${vcnt>0?`<span class="badge badge-purple">🏠 ${vcnt} υποδείξεις</span>`:''} ${p.ilist_id?`<span style="font-size:11px;color:var(--green);display:flex;align-items:center;gap:3px"><span class="sync-dot synced"></span>iList #${p.ilist_id}</span>`:''}</div>
         ${!p.ilist_id?`<button class="push-ilist-btn" id="push-ilist-property-${p.id}" onclick="pushToIList('property','${p.id}')">📤 Push to iList</button>`:''}
+        <div style="margin-top:10px">
+          <button class="ctx-voice-btn" onclick="startContextNote('property',null,null,'${p.id}')">🎙️ Σημείωση</button>
+        </div>
       </div>
 
       ${isMine&&(ownerName||ownerPhone)?`
@@ -713,6 +790,9 @@ function haptic(t){ try{tg?.HapticFeedback?.impactOccurred(t||'light');}catch(e)
         <div class="detail-header-sub">${r.requirement_type||'Αγορά'} · ${areas.join(', ')||'—'} · ${r.budget_min||r.budget_max?'€'+(r.budget_min||0).toLocaleString('el-GR')+'–'+(r.budget_max||0).toLocaleString('el-GR'):'—'}</div>
         <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px">${r.is_active!==false?'<span class="badge badge-green">Ενεργή</span>':'<span class="badge badge-red">Ανενεργή</span>'} ${ds?`<span style="font-size:11px;color:var(--text-dim)">${diffLabels[ds]||''}</span>`:''} ${r.ilist_id?`<span style="font-size:11px;color:var(--green);display:flex;align-items:center;gap:3px"><span class="sync-dot synced"></span>iList #${r.ilist_id}</span>`:''}</div>
         ${!r.ilist_id?`<button class="push-ilist-btn" id="push-ilist-inquiry-${r.id}" onclick="pushToIList('inquiry','${r.id}')">📤 Push to iList</button>`:''}
+        <div style="margin-top:10px">
+          <button class="ctx-voice-btn" onclick="startContextNote('requirement','${r.contact_id}','${r.id}',null)">🎙️ Σημείωση</button>
+        </div>
       </div>
 
       ${contact?`<div class="detail-section"><div class="detail-section-title">👤 Επαφή</div><div class="contact-card"><div style="font-weight:600;font-size:14px">${contact.full_name||'—'}</div>${contact.phone?`<div class="action-row">${phoneLinks(contact.phone)}</div>`:''}</div></div>`:''}
