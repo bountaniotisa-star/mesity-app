@@ -230,7 +230,11 @@
     @keyframes spin { to { transform: rotate(360deg); } }
     .sync-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-left: 4px; vertical-align: middle; }
     .sync-dot.synced { background: var(--green); }
-    .sync-dot.unsynced { background: var(--text-dim); }
+    .sync-dot.unsynced { background: var(--orange); }
+    .sync-btn-header { padding: 6px 12px; border-radius: 10px; background: var(--accent-dim); border: 1px solid rgba(52,232,165,0.3); color: var(--accent); font-size: 12px; font-weight: 600; cursor: pointer; font-family: 'DM Sans'; display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+    .sync-btn-header:active { background: var(--accent); color: var(--bg); }
+    .push-ilist-btn { width: 100%; padding: 10px; border-radius: 10px; background: rgba(91,138,245,0.13); border: 1px solid rgba(91,138,245,0.35); color: var(--blue); font-size: 13px; font-weight: 600; cursor: pointer; font-family: 'DM Sans'; display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 6px; }
+    .push-ilist-btn:active { background: rgba(91,138,245,0.25); }
   .sort-dropdown { background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: 13px; cursor: pointer; margin-left: auto; }
   .spitogatos-btn { background: var(--purple); border-radius: 10px; padding: 10px 16px; font-size: 14px; color: #fff; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
   .prop-mini-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; cursor: pointer; margin-top: 8px; }
@@ -266,7 +270,8 @@
     // ===== CONFIG =====
     const SB  = 'https://gdirlkqsusgaeryfldmd.supabase.co';
     const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdkaXJsa3FzdXNnYWVyeWZsZG1kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEzOTQ4ODIsImV4cCI6MjA4Njk3MDg4Mn0.94sLCjdNBk1b2XFVwN9byv756qSZydt5ihE16VmY8Yw';
-    const N8N_SYNC  = 'https://thanos.app.n8n.cloud/webhook/mesity-ilist-sync';
+    const N8N_SYNC      = 'https://thanos.app.n8n.cloud/webhook/mesity-ilist-sync';
+    const N8N_WRITEBACK = 'https://thanos.app.n8n.cloud/webhook/mesity-ilist-writeback-v2';
     const N8N_VOICE = 'https://thanos.app.n8n.cloud/webhook/voice-intelligence';
     const N8N_TEXT  = 'https://thanos.app.n8n.cloud/webhook/mesity-text-input';
     const MY_AGENT_ID = '117241';
@@ -446,6 +451,35 @@ function haptic(t){ try{tg?.HapticFeedback?.impactOccurred(t||'light');}catch(e)
       closeMenu(); haptic('medium'); toast('Ξεκίνησε sync...');
       try{ const uid=tg?.initDataUnsafe?.user?.id; const r=await fetch(N8N_SYNC,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({trigger:'mini_app',user:uid||'unknown'})}); const res=await r.json(); toast(`Sync: ${res.counts?.contacts||0} επαφές, ${res.counts?.estates||0} ακίνητα`); tg?.HapticFeedback?.notificationOccurred('success'); setTimeout(loadAll,1500); }catch(e){toast('Sync αποτυχία: '+e.message);}
     }
+
+    async function fullSyncIList(){
+      haptic('medium');
+      const btn=document.getElementById('sync-ilist-global-btn');
+      if(btn){ btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Sync...'; }
+      try{
+        const r=await fetch(N8N_SYNC,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'full_sync'})});
+        const res=await r.json();
+        toast('iList Sync ολοκληρώθηκε ✓');
+        tg?.HapticFeedback?.notificationOccurred('success');
+        setTimeout(loadAll,1500);
+      }catch(e){ toast('Sync αποτυχία: '+e.message); tg?.HapticFeedback?.notificationOccurred('error'); }
+      finally{ if(btn){ btn.disabled=false; btn.innerHTML='🔄 Sync iList'; } }
+    }
+
+    async function pushToIList(entityType, supabaseId){
+      haptic('medium');
+      const btnId=`push-ilist-${entityType}-${supabaseId}`;
+      const btn=document.getElementById(btnId);
+      if(btn){ btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Αποστολή...'; }
+      try{
+        const r=await fetch(N8N_WRITEBACK,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({entity_type:entityType,supabase_id:supabaseId})});
+        if(!r.ok) throw new Error(`HTTP ${r.status}`);
+        toast('Στάλθηκε στο iList ✓');
+        tg?.HapticFeedback?.notificationOccurred('success');
+        setTimeout(loadAll,1500);
+      }catch(e){ toast('Αποτυχία push: '+e.message); tg?.HapticFeedback?.notificationOccurred('error'); }
+      finally{ if(btn){ btn.disabled=false; btn.innerHTML='📤 Push to iList'; } }
+    }
     function reloadAll(){ closeMenu(); haptic('light'); toast('Ανανέωση...'); loadAll(); }
 
     // ===== MENU =====
@@ -568,6 +602,7 @@ function haptic(t){ try{tg?.HapticFeedback?.impactOccurred(t||'light');}catch(e)
       el.innerHTML=`<div class="drawer-header"><div class="back-btn" onclick="state.drawerMode='contacts';state.selectedContact=null;renderDrawer()">← Πίσω</div><div class="drawer-close" onclick="closeDrawer()">✕</div></div>
       <div class="cd-name">${c.full_name||'—'}</div><div style="margin-bottom:8px">${statusBadge(c.pipeline_stage||'Νέο Lead')}</div>
       <div class="cd-info">${c.phone?`<div class="cd-row">📞 <a href="tel:${c.phone}">${c.phone}</a></div>`:''} ${c.email?`<div class="cd-row">✉️ <a href="mailto:${c.email}">${c.email}</a></div>`:''} ${c.contact_type?`<div class="cd-row">🏷 ${c.contact_type}</div>`:''} ${c.ilist_id?`<div class="cd-row">🔗 iList #${c.ilist_id}</div>`:''}</div>
+      ${!c.ilist_id?`<button class="push-ilist-btn" id="push-ilist-contact-${c.id}" onclick="pushToIList('contact','${c.id}')">📤 Push to iList</button>`:''}
       <div class="cd-section"><div class="cd-section-title">Ζητήσεις (${reqs.length})</div>${reqs.map(r=>`<div class="list-item" style="margin-bottom:6px"><div style="font-size:13px;font-weight:500">${r.requirement_type||'Ζήτηση'} ${r.preferred_areas?'· '+(Array.isArray(r.preferred_areas)?r.preferred_areas.join(', '):r.preferred_areas):''}</div><div class="li-meta">${r.budget_max?'€'+(r.budget_min||0).toLocaleString('el-GR')+'–'+Number(r.budget_max).toLocaleString('el-GR'):''}</div></div>`).join('')||'<div class="li-meta">—</div>'}</div>
       <div class="cd-section"><div class="cd-section-title">Ιστορικό (${acts.length})</div>${acts.slice(0,10).map(a=>`<div style="padding:8px 0;border-bottom:1px solid var(--border);font-size:12px"><div style="color:var(--text-dim)">${a.activity_type||'note'} · ${fmtDate(a.created_at)}</div><div style="margin-top:2px">${a.raw_text||a.extracted_notes||'—'}</div></div>`).join('')||'<div class="li-meta">—</div>'}</div>`;
     }
@@ -593,7 +628,8 @@ function haptic(t){ try{tg?.HapticFeedback?.impactOccurred(t||'light');}catch(e)
       <div class="detail-section">
         <div class="detail-header-top"><div class="detail-header-name" style="flex:1">${propTitle(p)}</div><div>${renderStars(p.competitiveness_score||0)}</div></div>
         <div class="detail-header-sub">${propSubtitle(p)}</div>
-        <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px">${statusBadge(p.status)} ${eBadge} ${isMine?'<span class="badge badge-orange">Τα δικά μου</span>':''} ${vcnt>0?`<span class="badge badge-purple">🏠 ${vcnt} υποδείξεις</span>`:''}</div>
+        <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px">${statusBadge(p.status)} ${eBadge} ${isMine?'<span class="badge badge-orange">Τα δικά μου</span>':''} ${vcnt>0?`<span class="badge badge-purple">🏠 ${vcnt} υποδείξεις</span>`:''} ${p.ilist_id?`<span style="font-size:11px;color:var(--green);display:flex;align-items:center;gap:3px"><span class="sync-dot synced"></span>iList #${p.ilist_id}</span>`:''}</div>
+        ${!p.ilist_id?`<button class="push-ilist-btn" id="push-ilist-property-${p.id}" onclick="pushToIList('property','${p.id}')">📤 Push to iList</button>`:''}
       </div>
 
       ${isMine&&(ownerName||ownerPhone)?`
@@ -675,7 +711,8 @@ function haptic(t){ try{tg?.HapticFeedback?.impactOccurred(t||'light');}catch(e)
       <div class="detail-section">
         <div class="detail-header-top"><div class="detail-header-name" style="flex:1">${contact?.full_name||'—'}</div>${ds?`<div>${renderStars(ds,5,diffStarCls)}</div>`:''}</div>
         <div class="detail-header-sub">${r.requirement_type||'Αγορά'} · ${areas.join(', ')||'—'} · ${r.budget_min||r.budget_max?'€'+(r.budget_min||0).toLocaleString('el-GR')+'–'+(r.budget_max||0).toLocaleString('el-GR'):'—'}</div>
-        <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px">${r.is_active!==false?'<span class="badge badge-green">Ενεργή</span>':'<span class="badge badge-red">Ανενεργή</span>'} ${ds?`<span style="font-size:11px;color:var(--text-dim)">${diffLabels[ds]||''}</span>`:''}</div>
+        <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px">${r.is_active!==false?'<span class="badge badge-green">Ενεργή</span>':'<span class="badge badge-red">Ανενεργή</span>'} ${ds?`<span style="font-size:11px;color:var(--text-dim)">${diffLabels[ds]||''}</span>`:''} ${r.ilist_id?`<span style="font-size:11px;color:var(--green);display:flex;align-items:center;gap:3px"><span class="sync-dot synced"></span>iList #${r.ilist_id}</span>`:''}</div>
+        ${!r.ilist_id?`<button class="push-ilist-btn" id="push-ilist-inquiry-${r.id}" onclick="pushToIList('inquiry','${r.id}')">📤 Push to iList</button>`:''}
       </div>
 
       ${contact?`<div class="detail-section"><div class="detail-section-title">👤 Επαφή</div><div class="contact-card"><div style="font-weight:600;font-size:14px">${contact.full_name||'—'}</div>${contact.phone?`<div class="action-row">${phoneLinks(contact.phone)}</div>`:''}</div></div>`:''}
@@ -722,10 +759,10 @@ function haptic(t){ try{tg?.HapticFeedback?.impactOccurred(t||'light');}catch(e)
       <div class="detail-section"><div class="detail-section-title">💬 Ιστορικό ομιλίας</div>${timelineHtml}</div>
 
       <div class="detail-section">
-        <div class="detail-section-title">🏠 Αφορμή Ζήτησης</div>
+        <div class="detail-section-title">🔗 Αφορμή - Ακίνητο</div>
         ${(()=>{
           const tp=r.trigger_property_id?(state.properties||[]).find(p=>String(p.id)===String(r.trigger_property_id)):null;
-          const propHtml=tp?`<div class="prop-mini-card" onclick="openPropertyDetail('${tp.id}')"><div class="pmc-addr">${tp.address||tp.area||'Ακίνητο'}</div><div class="pmc-meta">${[tp.area,tp.sqm?tp.sqm+'τμ':(tp.sq_meters?tp.sq_meters+'τμ':null),tp.price?'€'+Number(tp.price).toLocaleString('el-GR'):null].filter(Boolean).join(' · ')}</div></div>`:r.trigger_property_id?`<div style="font-size:12px;color:var(--text-dim);padding:6px 0">🔗 Linked property ID: ${r.trigger_property_id}</div>`:`<div style="font-size:12px;color:var(--text-dim);padding:6px 0">Δεν έχει οριστεί αφορμή ακινήτου.</div>`;
+          const propHtml=tp?`<div class="prop-mini-card" onclick="openPropertyDetail('${tp.id}')"><div class="pmc-addr">${tp.address||tp.title||tp.area||'Ακίνητο'}</div><div class="pmc-meta">${[tp.area,tp.sqm?tp.sqm+'τμ':(tp.sq_meters?tp.sq_meters+'τμ':null),tp.price?'€'+Number(tp.price).toLocaleString('el-GR'):null].filter(Boolean).join(' · ')}</div></div>`:r.trigger_property_id?`<div style="font-size:12px;color:var(--text-dim);padding:6px 0">🔗 Linked property ID: ${r.trigger_property_id}</div>`:`<div style="font-size:12px;color:var(--text-dim);padding:6px 0">Χωρίς συνδεδεμένο ακίνητο</div>`;
           return propHtml;
         })()}
         <div style="margin-top:8px">
@@ -750,7 +787,7 @@ function haptic(t){ try{tg?.HapticFeedback?.impactOccurred(t||'light');}catch(e)
         {num:state.followUps.length,    label:'Next Steps', color:'var(--orange)'},
       ];
       let html=`
-      <div class="header"><div class="header-top"><div class="logo">Mesity <span>CRM</span></div><div class="menu-btn" onclick="toggleMenu()">⋯</div></div></div>
+      <div class="header"><div class="header-top"><div class="logo">Mesity <span>CRM</span></div><div style="display:flex;align-items:center;gap:8px"><button class="sync-btn-header" id="sync-ilist-global-btn" onclick="fullSyncIList()">🔄 Sync iList</button><div class="menu-btn" onclick="toggleMenu()">⋯</div></div></div></div>
       <div class="stats">${stats.map(s=>`<div class="stat-card"><div class="stat-num" style="color:${s.color}">${s.num}</div><div class="stat-label">${s.label}</div></div>`).join('')}</div>
       <div class="tabs">
         <div class="tab ${state.tab==='properties'  ?'active':''}" onclick="switchTab('properties')">🏠 Ακίνητα</div>
@@ -784,7 +821,7 @@ function haptic(t){ try{tg?.HapticFeedback?.impactOccurred(t||'light');}catch(e)
         ${sortProperties(items,state.propertiesSort).slice(0,100).map(p=>{
           const isMine=String(p.agent_ilist_id)===MY_AGENT_ID; const vcnt=viewingsForProp(p.id).length;
           return`<div class="list-item" onclick="openPropertyDetail('${p.id}')">
-            <div class="li-top">${p.ilist_id?`<span class="li-code">#${p.ilist_id}</span>`:'<span></span>'}<div>${renderStars(p.competitiveness_score||0)}</div></div>
+            <div class="li-top">${p.ilist_id?`<span class="li-code">#${p.ilist_id}</span>`:'<span></span>'}<div style="display:flex;align-items:center;gap:6px">${renderStars(p.competitiveness_score||0)}<span class="sync-dot ${p.ilist_id?'synced':'unsynced'}" title="${p.ilist_id?'Συγχρονισμένο':'Μη συγχρονισμένο'}"></span></div></div>
             <div class="li-title">${propTitle(p)}</div>
             <div class="li-meta">${statusBadge(p.listing_type||p.status)} ${p.price?`<span style="font-weight:600;color:var(--text)">€${Number(p.price).toLocaleString('el-GR')}</span>`:''} ${p.bedrooms?`<span>${p.bedrooms}υ/δ</span>`:''} ${p.floor?`<span>${p.floor}ος</span>`:''}</div>
             <div class="li-meta">${isMine?`<span>👤 ${p.agent_name||'Εγώ'}</span>`:(p.agent_name?`<span>👤 ${p.agent_name}</span>`:'')} ${vcnt>0?`<span style="color:var(--purple)">🏠 ${vcnt} υποδείξεις</span>`:''}</div>
@@ -808,7 +845,7 @@ function haptic(t){ try{tg?.HapticFeedback?.impactOccurred(t||'light');}catch(e)
           const areas=Array.isArray(r.preferred_areas)?r.preferred_areas:(r.preferred_areas?String(r.preferred_areas).split(',').map(s=>s.trim()).filter(Boolean):[]);
           const ds=r.difficulty_score||0; const isBuy=(r.requirement_type||'').toLowerCase().includes('αγορά')||(r.requirement_type||'').toLowerCase().includes('buy');
           return`<div class="list-item" onclick="openRequirementDetail('${r.id}')">
-            <div class="li-top"><span class="badge ${isBuy?'badge-blue':'badge-green'}">${r.requirement_type||'Αγορά'}</span><div>${renderStars(ds,5,diffStarCls)}</div></div>
+            <div class="li-top"><span class="badge ${isBuy?'badge-blue':'badge-green'}">${r.requirement_type||'Αγορά'}</span><div style="display:flex;align-items:center;gap:6px">${renderStars(ds,5,diffStarCls)}<span class="sync-dot ${r.ilist_id?'synced':'unsynced'}" title="${r.ilist_id?'Συγχρονισμένο':'Μη συγχρονισμένο'}"></span></div></div>
             <div class="li-title">${contactName(r.contact_id)}</div>
             <div class="li-meta">${r.budget_min||r.budget_max?`<span>💰 €${(r.budget_min||0).toLocaleString('el-GR')}–${(r.budget_max||0).toLocaleString('el-GR')}</span>`:''} ${r.sqm_min?`<span>📐 ${r.sqm_min}${r.sqm_max?'–'+r.sqm_max:''}τμ</span>`:''} ${r.bedrooms_min?`<span>🛏 ${r.bedrooms_min}+ υ/δ</span>`:''}</div>
             ${areas.length?`<div class="area-chips">${areas.slice(0,5).map(a=>`<span class="area-chip">${a}</span>`).join('')}${areas.length>5?`<span class="area-chip">+${areas.length-5}</span>`:''}</div>`:''}
